@@ -40,7 +40,7 @@ async function fetchPricesFromEntrade(tickers) {
   await Promise.all(
     tickers.map(async (ticker) => {
       try {
-        const url = `https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?resolution=1D&symbol=${ticker}&from=${fewDaysAgo}&to=${today}`;
+        const url = `/api/entrade/stock?resolution=1D&symbol=${ticker}&from=${fewDaysAgo}&to=${today}`;
         const response = await fetch(url);
         const data = await response.json();
         if (data && data.c && data.c.length > 0) {
@@ -71,8 +71,12 @@ function MainApp({ onLogout }) {
   });
   
   useEffect(() => {
-    const toSave = stocks.map(({ id, date, ticker, source, buyPrice }) => ({ id, date, ticker, source, buyPrice }));
-    localStorage.setItem("app_stocks", JSON.stringify(toSave));
+    try {
+      const toSave = stocks.map(({ id, date, ticker, source, buyPrice }) => ({ id, date, ticker, source, buyPrice }));
+      localStorage.setItem("app_stocks", JSON.stringify(toSave));
+    } catch (e) {
+      console.error("Lỗi lưu danh mục, có thể localStorage đã đầy:", e);
+    }
   }, [stocks]);
   const [selectedSource, setSelectedSource] = useState("Tất cả");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -85,9 +89,37 @@ function MainApp({ onLogout }) {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const url = event.target.result;
-        setAvatarUrl(url);
-        localStorage.setItem("app_avatar", url);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_SIZE = 120;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+          try {
+            setAvatarUrl(dataUrl);
+            localStorage.setItem("app_avatar", dataUrl);
+          } catch (err) {
+            console.error(err);
+            alert("Lỗi lưu ảnh! Thử dùng ảnh nhỏ hơn.");
+          }
+        };
+        img.src = event.target.result;
       };
       reader.readAsDataURL(file);
     }
@@ -202,13 +234,9 @@ function MainApp({ onLogout }) {
       padding: "0",
     }}>
       {/* Header */}
-      <div style={{
+      <div className="header-container" style={{
         background: "linear-gradient(135deg, #0d1117 0%, #161b22 100%)",
         borderBottom: "1px solid #21262d",
-        padding: "20px 28px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div 
@@ -240,7 +268,7 @@ function MainApp({ onLogout }) {
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div className="header-actions">
           <select
             value={selectedSource}
             onChange={(e) => setSelectedSource(e.target.value)}
@@ -350,7 +378,7 @@ function MainApp({ onLogout }) {
       )}
 
       {/* Dashboard */}
-      <div style={{ padding: "20px 28px", display: "flex", gap: 12 }}>
+      <div className="dashboard-container">
         {[
           { label: "Tổng mã", value: displayedStocks.length, color: "#e6edf3" },
           { label: "Số mã Tốt", value: goodCount, color: "#00d68f" },
@@ -361,8 +389,7 @@ function MainApp({ onLogout }) {
             color: avgPnl == null ? "#6e7681" : avgPnl >= 0 ? "#00d68f" : "#ff4757",
           },
         ].map((card) => (
-          <div key={card.label} style={{
-            flex: 1,
+          <div key={card.label} className="dashboard-card" style={{
             background: "#161b22",
             border: "1px solid #21262d",
             borderRadius: 10,
@@ -379,14 +406,9 @@ function MainApp({ onLogout }) {
       </div>
 
       {/* Table */}
-      <div style={{ padding: "0 28px 28px" }}>
-        <div style={{
-          background: "#161b22",
-          border: "1px solid #21262d",
-          borderRadius: 10,
-          overflow: "hidden",
-        }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <div className="table-wrapper">
+        <div className="table-responsive">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 700 }}>
             <thead>
               <tr style={{ background: "#0d1117" }}>
                 {["STT", "Ngày KN", "Mã CP", "Nguồn", "Giá KN", "Giá hiện tại", "% Lãi/Lỗ", "Đánh giá", "T+", ""].map((h) => (
@@ -492,6 +514,7 @@ function MainApp({ onLogout }) {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+        * { box-sizing: border-box; }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
@@ -499,6 +522,45 @@ function MainApp({ onLogout }) {
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-5px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        .header-container {
+          padding: 20px 28px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+        .header-actions {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+        .dashboard-container {
+          padding: 20px 28px;
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .dashboard-card {
+           flex: 1;
+           min-width: 130px;
+        }
+        .table-wrapper {
+           padding: 0 28px 28px;
+        }
+        .table-responsive {
+           background: #161b22;
+           border: 1px solid #21262d;
+           border-radius: 10px;
+           overflow-x: auto;
+        }
+        @media (max-width: 768px) {
+          .header-container { padding: 16px; flex-direction: column; align-items: flex-start; }
+          .header-actions { width: 100%; justify-content: flex-start; }
+          .dashboard-container { padding: 16px; }
+          .table-wrapper { padding: 0 16px 16px; }
         }
       `}</style>
     </div>

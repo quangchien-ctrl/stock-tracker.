@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<script>
+  fetch('https://services.entrade.com.vn/chart-api/v2/ohlcs/stock?resolution=1D&symbol=FPT&from=1711843200&to=1712016000')
+    .then(res => res.json())
+    .then(data => console.log('DATA:', data))
+    .catch(err => console.error('ERROR:', err));
+</script>
+</body>
+</html>

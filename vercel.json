@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/entrade/:match*",
+      "destination": "https://services.entrade.com.vn/chart-api/v2/ohlcs/:match*"
+    }
+  ]
+}
